@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Hukuk İngilizcesi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Source+Sans+3:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Source Sans 3',system-ui,sans-serif;background:#060a13;color:#f1f5f9;min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#334155;border-radius:4px}
+button{font-family:'Source Sans 3',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent}
+input:focus,button:focus{outline:none}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+
+<script type="text/babel">
+const {useState,useEffect,useRef,useMemo}=React;
+
+// ══════ GOOGLE SHEETS CSV URL ══════
+// Sheets hazır olduğunda bu URL'yi değiştir:
+const SHEETS_CSV_URL = "";
+// Örnek: "https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?gid=0&single=true&output=csv"
+
+// ══════ GÖMÜlÜ VERİ (Sheets bağlanana kadar bu kullanılır) ══════
+const BUILTIN_WORDS=[
+{id:1,en:"law",tr:"hukuk / kanun",level:"A1",cat:"Genel",ex:"Everyone must obey the law.",exTr:"Herkes kanuna uymak zorundadır."},
+{id:2,en:"court",tr:"mahkeme",level:"A1",cat:"Genel",ex:"The court will decide the case.",exTr:"Mahkeme davayı karara bağlayacak."},
+{id:3,en:"judge",tr:"hâkim",level:"A1",cat:"Genel",ex:"The judge listened to both sides.",exTr:"Hâkim her iki tarafı da dinledi."},
+{id:4,en:"lawyer",tr:"avukat",level:"A1",cat:"Genel",ex:"She hired a lawyer.",exTr:"Bir avukat tuttu."},
+{id:5,en:"right",tr:"hak",level:"A1",cat:"Genel",ex:"You have the right to remain silent.",exTr:"Sessiz kalma hakkınız var."},
+{id:6,en:"crime",tr:"suç",level:"A1",cat:"Ceza",ex:"Theft is a crime.",exTr:"Hırsızlık bir suçtur."},
+{id:7,en:"evidence",tr:"delil / kanıt",level:"A1",cat:"Genel",ex:"There is no evidence of the crime.",exTr:"Suça dair kanıt yok."},
+{id:8,en:"contract",tr:"sözleşme",level:"A1",cat:"Sözleşme",ex:"Please sign the contract.",exTr:"Lütfen sözleşmeyi imzalayın."},
+{id:9,en:"witness",tr:"tanık",level:"A1",cat:"Genel",ex:"The witness told the truth.",exTr:"Tanık doğruyu söyledi."},
+{id:10,en:"guilty",tr:"suçlu",level:"A1",cat:"Ceza",ex:"The jury found him guilty.",exTr:"Jüri onu suçlu buldu."},
+{id:11,en:"arrest",tr:"tutuklama",level:"A1",cat:"Ceza",ex:"The police made an arrest.",exTr:"Polis tutuklama yaptı."},
+{id:12,en:"innocent",tr:"masum",level:"A1",cat:"Ceza",ex:"He was found innocent.",exTr:"Masum bulundu."},
+{id:13,en:"plaintiff",tr:"davacı",level:"A2",cat:"Genel",ex:"The plaintiff filed a complaint.",exTr:"Davacı şikâyette bulundu."},
+{id:14,en:"defendant",tr:"davalı / sanık",level:"A2",cat:"Genel",ex:"The defendant pleaded not guilty.",exTr:"Sanık suçsuz olduğunu beyan etti."},
+{id:15,en:"verdict",tr:"karar / hüküm",level:"A2",cat:"Genel",ex:"The jury reached a verdict.",exTr:"Jüri karara vardı."},
+{id:16,en:"appeal",tr:"istinaf / itiraz",level:"A2",cat:"Genel",ex:"They decided to appeal.",exTr:"İtiraz etmeye karar verdiler."},
+{id:17,en:"testimony",tr:"tanıklık / ifade",level:"A2",cat:"Genel",ex:"Her testimony was crucial.",exTr:"İfadesi çok önemliydi."},
+{id:18,en:"fraud",tr:"dolandırıcılık",level:"A2",cat:"Ceza",ex:"He was charged with fraud.",exTr:"Dolandırıcılıkla suçlandı."},
+{id:19,en:"bail",tr:"kefalet",level:"A2",cat:"Ceza",ex:"The judge set bail.",exTr:"Hâkim kefalet belirledi."},
+{id:20,en:"negligence",tr:"ihmal",level:"A2",cat:"Borçlar",ex:"The accident was caused by negligence.",exTr:"Kaza ihmalden kaynaklandı."},
+{id:21,en:"prosecution",tr:"kovuşturma",level:"A2",cat:"Ceza",ex:"The prosecution presented its case.",exTr:"Savcılık davasını sundu."},
+{id:22,en:"damages",tr:"tazminat",level:"A2",cat:"Borçlar",ex:"She claimed damages.",exTr:"Tazminat talep etti."},
+{id:23,en:"jurisdiction",tr:"yargı yetkisi",level:"B1",cat:"Genel",ex:"This falls outside our jurisdiction.",exTr:"Bu yargı yetkimiz dışındadır."},
+{id:24,en:"precedent",tr:"emsal / içtihat",level:"B1",cat:"Genel",ex:"The ruling set a legal precedent.",exTr:"Karar emsal oluşturdu."},
+{id:25,en:"arbitration",tr:"tahkim",level:"B1",cat:"Genel",ex:"The dispute was settled through arbitration.",exTr:"Uyuşmazlık tahkim yoluyla çözüldü."},
+{id:26,en:"breach",tr:"ihlal",level:"B1",cat:"Borçlar",ex:"It was a breach of contract.",exTr:"Sözleşme ihlaliydi."},
+{id:27,en:"indictment",tr:"iddianame",level:"B1",cat:"Ceza",ex:"The indictment was filed.",exTr:"İddianame düzenlendi."},
+{id:28,en:"litigation",tr:"dava süreci",level:"B1",cat:"Genel",ex:"Litigation can be expensive.",exTr:"Dava süreci masraflı olabilir."},
+{id:29,en:"mediation",tr:"arabuluculuk",level:"B1",cat:"Genel",ex:"Mediation resolved the dispute.",exTr:"Arabuluculuk uyuşmazlığı çözdü."},
+{id:30,en:"compliance",tr:"uyum / uygunluk",level:"B1",cat:"Genel",ex:"The company ensured compliance.",exTr:"Şirket uyumu sağladı."},
+{id:31,en:"tort",tr:"haksız fiil",level:"B2",cat:"Borçlar",ex:"Tort law deals with civil wrongs.",exTr:"Haksız fiil hukuku hukuka aykırı fiillerle ilgilenir."},
+{id:32,en:"due diligence",tr:"durum tespiti",level:"B2",cat:"Ticaret",ex:"Due diligence was conducted.",exTr:"Durum tespiti yapıldı."},
+{id:33,en:"force majeure",tr:"mücbir sebep",level:"B2",cat:"Sözleşme",ex:"Force majeure excused the delay.",exTr:"Mücbir sebep gecikmeyi mazur kıldı."},
+{id:34,en:"fiduciary duty",tr:"sadakat borcu",level:"B2",cat:"Ticaret",ex:"Directors owe a fiduciary duty.",exTr:"Yöneticilerin sadakat borcu vardır."},
+{id:35,en:"prima facie",tr:"ilk bakışta",level:"C1",cat:"Latince",ex:"There is prima facie evidence.",exTr:"İlk bakışta kanıt mevcuttur.",latin:"prima facie"},
+{id:36,en:"res judicata",tr:"kesin hüküm",level:"C1",cat:"Latince",ex:"The matter is res judicata.",exTr:"Mesele kesin hükümdür.",latin:"res judicata"},
+{id:37,en:"habeas corpus",tr:"kişi özgürlüğü güvencesi",level:"C1",cat:"Latince",ex:"A habeas corpus petition was filed.",exTr:"Kişi özgürlüğü başvurusu yapıldı.",latin:"habeas corpus"},
+{id:38,en:"stare decisis",tr:"içtihat bağlayıcılığı",level:"C1",cat:"Latince",ex:"The court followed stare decisis.",exTr:"Mahkeme içtihat bağlayıcılığını uyguladı.",latin:"stare decisis"},
+{id:39,en:"mens rea",tr:"suç kastı",level:"C2",cat:"Latince",ex:"Mens rea must be proven.",exTr:"Suç kastı kanıtlanmalıdır.",latin:"mens rea"},
+{id:40,en:"jus cogens",tr:"emredici norm",level:"C2",cat:"Latince",ex:"Torture prohibition is jus cogens.",exTr:"İşkence yasağı emredici normdur.",latin:"jus cogens"},
+];
+
+const COLLOCATIONS=[
+{id:1,en:"file a lawsuit",tr:"dava açmak",ex:"The company filed a lawsuit.",exTr:"Şirket dava açtı."},
+{id:2,en:"bring an action",tr:"dava ikame etmek",ex:"The plaintiff brought an action.",exTr:"Davacı dava açtı."},
+{id:3,en:"grant bail",tr:"kefaletle tahliye etmek",ex:"The judge granted bail.",exTr:"Hâkim kefaletle tahliye etti."},
+{id:4,en:"reach a verdict",tr:"karara varmak",ex:"The jury reached a verdict.",exTr:"Jüri karara vardı."},
+{id:5,en:"serve a sentence",tr:"cezasını çekmek",ex:"He served a five-year sentence.",exTr:"Beş yıllık cezasını çekti."},
+{id:6,en:"breach a duty",tr:"yükümlülüğü ihlal etmek",ex:"The director breached his duty.",exTr:"Müdür yükümlülüğünü ihlal etti."},
+{id:7,en:"sustain an objection",tr:"itirazı kabul etmek",ex:"The court sustained the objection.",exTr:"Mahkeme itirazı kabul etti."},
+{id:8,en:"render a decision",tr:"karar vermek",ex:"The court rendered its decision.",exTr:"Mahkeme kararını verdi."},
+];
+
+const LEVELS=["A1","A2","B1","B2","C1","C2"];
+const LC={A1:"#10b981",A2:"#3b82f6",B1:"#8b5cf6",B2:"#f59e0b",C1:"#ef4444",C2:"#ec4899"};
+const f={serif:"'Playfair Display',Georgia,serif",sans:"'Source Sans 3',system-ui,sans-serif"};
+
+function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
+function speak(t){
+  if(!window.speechSynthesis)return;
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(t);
+  u.lang="en-US";
+  u.rate=0.9;
+  u.pitch=1.0;
+  // En iyi sesi bul: Google > Microsoft > diğer
+  const voices=window.speechSynthesis.getVoices();
+  const prefer=voices.find(v=>v.name.includes("Google")&&v.lang.startsWith("en"))
+    ||voices.find(v=>v.name.includes("Samantha")&&v.lang.startsWith("en"))
+    ||voices.find(v=>v.name.includes("Microsoft")&&v.lang.startsWith("en")&&v.name.includes("Online"))
+    ||voices.find(v=>v.name.includes("Daniel")&&v.lang.startsWith("en"))
+    ||voices.find(v=>v.lang.startsWith("en")&&v.localService===false)
+    ||voices.find(v=>v.lang.startsWith("en"));
+  if(prefer)u.voice=prefer;
+  window.speechSynthesis.speak(u);
+}
+// Sesleri önceden yükle
+if(window.speechSynthesis){window.speechSynthesis.getVoices();window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();}
+
+// ══════ CSV PARSER ══════
+function parseCSV(csv){
+  const lines=csv.split('\n').filter(l=>l.trim());
+  if(lines.length<2)return[];
+  return lines.slice(1).map((line,i)=>{
+    // Handle CSV with possible quoted fields
+    const parts=[];let cur='',inQ=false;
+    for(let c of line){
+      if(c==='"'){inQ=!inQ;}
+      else if(c===','&&!inQ){parts.push(cur.trim());cur='';}
+      else{cur+=c;}
+    }
+    parts.push(cur.trim());
+    return{id:parseInt(parts[0])||i+1,en:parts[1]||'',tr:parts[2]||'',level:parts[3]||'A1',cat:parts[4]||'Genel',ex:parts[5]||'',exTr:parts[6]||''};
+  }).filter(w=>w.en);
+}
+
+// ══════ MAIN APP ══════
+function App(){
+  const[words,setWords]=useState(BUILTIN_WORDS);
+  const[loading,setLoading]=useState(false);
+  const[screen,setScreen]=useState("home");
+  const[tab,setTab]=useState("study");
+  const[search,setSearch]=useState("");
+  const[levelFilter,setLevelFilter]=useState("all");
+
+  // Flashcard
+  const[fcCards,setFcCards]=useState([]);
+  const[fcIdx,setFcIdx]=useState(0);
+  const[fcFlip,setFcFlip]=useState(false);
+  const[fcKnown,setFcKnown]=useState(0);
+
+  // Games
+  const[gameType,setGameType]=useState(null);
+  const[gameData,setGameData]=useState([]);
+  const[gameIdx,setGameIdx]=useState(0);
+  const[gameScore,setGameScore]=useState(0);
+  const[gameAnswer,setGameAnswer]=useState(null);
+  const[matchPairs,setMatchPairs]=useState([]);
+  const[matchSel,setMatchSel]=useState([]);
+  const[matchDone,setMatchDone]=useState([]);
+  const[fillAns,setFillAns]=useState("");
+  const[speedTime,setSpeedTime]=useState(30);
+  const[speedOn,setSpeedOn]=useState(false);
+  const timerRef=useRef(null);
+
+  // Collocations
+  const[colloIdx,setColloIdx]=useState(0);
+  const[colloFlip,setColloFlip]=useState(false);
+  const colloCards=useMemo(()=>shuffle(COLLOCATIONS),[]);
+
+  // Load from Sheets if URL exists
+  useEffect(()=>{
+    if(SHEETS_CSV_URL){
+      setLoading(true);
+      fetch(SHEETS_CSV_URL)
+        .then(r=>r.text())
+        .then(csv=>{const parsed=parseCSV(csv);if(parsed.length>0)setWords(parsed);})
+        .catch(()=>{})
+        .finally(()=>setLoading(false));
+    }
+  },[]);
+
+  // Filtered words
+  const filtered=useMemo(()=>{
+    let w=words;
+    if(levelFilter!=="all")w=w.filter(x=>x.level===levelFilter);
+    if(search)w=w.filter(x=>x.en.toLowerCase().includes(search.toLowerCase())||x.tr.toLowerCase().includes(search.toLowerCase()));
+    return w;
+  },[words,levelFilter,search]);
+
+  const levelCounts=useMemo(()=>{
+    const c={};LEVELS.forEach(l=>c[l]=words.filter(w=>w.level===l).length);return c;
+  },[words]);
+
+  // ═══ STYLES ═══
+  const c={bg:"#060a13",card:"#151d2e",cardBorder:"#1e2d44",text:"#f1f5f9",textMuted:"#94a3b8",textDim:"#64748b",textFaint:"#3e5068",accent:"#3b82f6",accent2:"#8b5cf6",success:"#10b981",danger:"#ef4444",warning:"#f59e0b",surface:"#0c1220"};
+
+  const S={
+    app:{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center"},
+    wrap:{width:"100%",maxWidth:520,padding:"0 20px 40px"},
+    back:{background:"none",border:"none",color:c.textDim,fontSize:13,cursor:"pointer",padding:"8px 0"},
+    section:{fontSize:10,fontWeight:800,letterSpacing:2.5,textTransform:"uppercase",color:c.textFaint,margin:"18px 0 8px"},
+    card:{padding:"16px",background:c.card,borderRadius:14,border:`1px solid ${c.cardBorder}`,marginBottom:8,cursor:"pointer",transition:"all 0.2s"},
+    row:{display:"flex",alignItems:"center",gap:12},
+    icon:(bg)=>({width:44,height:44,borderRadius:12,background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}),
+    badge:(col)=>({fontSize:10,fontWeight:700,color:col,background:col+"18",padding:"3px 9px",borderRadius:6}),
+    btn:(bg,full)=>({width:full?"100%":"auto",padding:"14px 20px",borderRadius:12,border:"none",background:bg||`linear-gradient(135deg,${c.accent},${c.accent2})`,color:"#fff",fontSize:15,fontWeight:700,transition:"all 0.15s"}),
+    btnOutline:{width:"100%",padding:"14px",borderRadius:12,border:`1px solid ${c.cardBorder}`,background:"transparent",color:c.textMuted,fontSize:15,fontWeight:700,marginTop:8},
+    progress:{width:"100%",height:4,background:c.surface,borderRadius:2,overflow:"hidden",marginTop:8},
+    fill:(pct,col)=>({width:`${pct}%`,height:"100%",background:col||c.accent,borderRadius:2,transition:"width 0.3s"}),
+    input:{width:"100%",padding:"12px 16px",borderRadius:12,border:`1px solid ${c.cardBorder}`,background:c.surface,color:c.text,fontSize:15,fontFamily:f.sans},
+    quizOpt:(correct,wrong)=>({width:"100%",padding:"12px 16px",borderRadius:10,marginBottom:6,border:`2px solid ${correct?c.success:wrong?c.danger:c.cardBorder}`,background:correct?c.success+"12":wrong?c.danger+"12":c.card,color:correct?c.success:wrong?c.danger:c.text,fontSize:14,fontWeight:600,textAlign:"left",transition:"all 0.2s",cursor:"pointer"}),
+    matchBtn:(sel,done)=>({padding:"12px",borderRadius:10,border:`2px solid ${done?c.success:sel?c.accent:c.cardBorder}`,background:done?c.success+"12":sel?c.accent+"12":c.card,color:done?c.success:sel?c.accent:c.text,fontSize:13,fontWeight:600,opacity:done?0.4:1,textDecoration:done?"line-through":"none",transition:"all 0.15s",cursor:"pointer"}),
+    resultBox:{background:c.card,borderRadius:20,padding:"36px 24px",textAlign:"center",border:`1px solid ${c.cardBorder}`,marginTop:20},
+  };
+
+  // ═══ GAMES ═══
+  const startFlashcards=()=>{
+    const pool=shuffle(filtered.length>0?filtered:words);
+    setFcCards(pool);setFcIdx(0);setFcFlip(false);setFcKnown(0);setScreen("flashcard");
+  };
+
+  const startMatch=()=>{
+    const pool=shuffle(words).slice(0,6);
+    setMatchPairs([...shuffle(pool.map(w=>({id:w.id,text:w.en,side:"en"}))),
+      ...shuffle(pool.map(w=>({id:w.id,text:w.tr,side:"tr"})))]);
+    setMatchSel([]);setMatchDone([]);setGameScore(0);setGameType("match");setScreen("game");
+  };
+
+  const startFill=()=>{
+    const pool=shuffle(words).slice(0,10);
+    setGameData(pool);setGameIdx(0);setGameScore(0);setFillAns("");setGameAnswer(null);
+    setGameType("fill");setScreen("game");
+  };
+
+  const startSpeed=()=>{
+    const pool=shuffle(words);
+    setGameData(pool);setGameIdx(0);setGameScore(0);setSpeedTime(30);setGameAnswer(null);setSpeedOn(true);
+    setGameType("speed");setScreen("game");
+    if(timerRef.current)clearInterval(timerRef.current);
+    timerRef.current=setInterval(()=>{
+      setSpeedTime(p=>{if(p<=1){clearInterval(timerRef.current);setSpeedOn(false);setScreen("gameResult");return 0;}return p-1;});
+    },1000);
+  };
+
+  const handleMatch=(item,idx)=>{
+    if(matchDone.includes(item.id))return;
+    if(matchSel.length===0)setMatchSel([{...item,idx}]);
+    else{
+      const first=matchSel[0];if(first.idx===idx)return;
+      if(first.id===item.id&&first.side!==item.side){setMatchDone(p=>[...p,item.id]);setGameScore(s=>s+1);setMatchSel([]);}
+      else setMatchSel([{...item,idx}]);
+    }
+  };
+
+  useEffect(()=>{if(matchDone.length>=6&&screen==="game"&&gameType==="match")setTimeout(()=>setScreen("gameResult"),600);},[matchDone]);
+  useEffect(()=>()=>{if(timerRef.current)clearInterval(timerRef.current);},[]);
+
+  // ═══ HOME ═══
+  if(screen==="home"){
+    return(
+      <div style={S.app}>
+        <div style={S.wrap}>
+          <div style={{textAlign:"center",padding:"28px 0 16px"}}>
+            <div style={{width:48,height:48,margin:"0 auto 10px",borderRadius:14,background:`linear-gradient(135deg,${c.warning},${c.danger})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⚖</div>
+            <h1 style={{fontFamily:f.serif,fontSize:24,fontWeight:700}}>Hukuk İngilizcesi</h1>
+            <p style={{fontSize:12,color:c.textDim,marginTop:4}}>Kelimeler · Kalıplar · Oyunlar</p>
+            <p style={{fontSize:11,color:c.textFaint,marginTop:6}}>{words.length} terim · A1-C2</p>
+            {loading&&<p style={{fontSize:11,color:c.accent,marginTop:4}}>Veriler yükleniyor...</p>}
+          </div>
+
+          {/* Tabs */}
+          <div style={{display:"flex",gap:3,background:c.card,borderRadius:10,padding:3,marginBottom:16,border:`1px solid ${c.cardBorder}`}}>
+            {[["study","Çalış"],["games","Oyunlar"],["collocations","Kalıplar"],["latin","Latince"]].map(([k,v])=>(
+              <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:"10px 0",borderRadius:8,border:"none",background:tab===k?c.accent+"18":"transparent",color:tab===k?c.accent:c.textDim,fontSize:12,fontWeight:700,transition:"all 0.2s"}}>{v}</button>
+            ))}
+          </div>
+
+          {/* STUDY */}
+          {tab==="study"&&(<div style={{animation:"fadeUp 0.3s"}}>
+            {/* Search */}
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Kelime ara..." style={{...S.input,marginBottom:12}}/>
+
+            {/* Level filters */}
+            <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
+              <button onClick={()=>setLevelFilter("all")} style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${levelFilter==="all"?c.accent:c.cardBorder}`,background:levelFilter==="all"?c.accent+"18":"transparent",color:levelFilter==="all"?c.accent:c.textDim,fontSize:12,fontWeight:600}}>Tümü ({words.length})</button>
+              {LEVELS.map(l=>(
+                <button key={l} onClick={()=>setLevelFilter(l)} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${levelFilter===l?LC[l]:c.cardBorder}`,background:levelFilter===l?LC[l]+"18":"transparent",color:levelFilter===l?LC[l]:c.textDim,fontSize:12,fontWeight:600}}>{l} ({levelCounts[l]||0})</button>
+              ))}
+            </div>
+
+            {/* Start Flashcard */}
+            <div style={{...S.card,...S.row}} onClick={startFlashcards}>
+              <div style={S.icon(`linear-gradient(135deg,${c.accent},${c.accent2})`)}>🃏</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:15,fontWeight:700}}>Flashcard Çalış</div>
+                <div style={{fontSize:12,color:c.textDim}}>{filtered.length} kelime</div>
+              </div>
+              <span style={{color:c.textFaint}}>→</span>
+            </div>
+
+            {/* Word list */}
+            <p style={S.section}>Kelime Listesi</p>
+            <div style={{maxHeight:400,overflowY:"auto",borderRadius:12,border:`1px solid ${c.cardBorder}`}}>
+              {filtered.slice(0,50).map((w,i)=>(
+                <div key={w.id} style={{padding:"10px 14px",borderBottom:`1px solid ${c.cardBorder}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <span style={{fontWeight:700,color:c.text,marginRight:8}}>{w.en}</span>
+                    <span style={{color:c.textMuted,fontSize:13}}>{w.tr}</span>
+                  </div>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={S.badge(LC[w.level])}>{w.level}</span>
+                    <button onClick={()=>speak(w.en)} style={{background:"none",border:"none",fontSize:14,cursor:"pointer"}}>🔊</button>
+                  </div>
+                </div>
+              ))}
+              {filtered.length>50&&<div style={{padding:12,textAlign:"center",color:c.textFaint,fontSize:12}}>+{filtered.length-50} terim daha...</div>}
+            </div>
+          </div>)}
+
+          {/* GAMES */}
+          {tab==="games"&&(<div style={{animation:"fadeUp 0.3s"}}>
+            <p style={S.section}>Mini Oyunlar</p>
+            {[
+              {name:"Eşleştirme",desc:"EN-TR çiftleri eşleştir",icon:"🧩",bg:`linear-gradient(135deg,${c.success},#34d399)`,fn:startMatch},
+              {name:"Harf Tamamlama",desc:"Türkçe'den İngilizce yaz",icon:"✏️",bg:`linear-gradient(135deg,${c.accent},${c.accent2})`,fn:startFill},
+              {name:"Hız Turu",desc:"30 saniyede kaç doğru?",icon:"⚡",bg:`linear-gradient(135deg,${c.danger},#f87171)`,fn:startSpeed},
+            ].map((g,i)=>(
+              <div key={i} style={{...S.card,...S.row,animation:`slideIn 0.3s ease ${i*0.05}s both`}} onClick={g.fn}>
+                <div style={S.icon(g.bg)}>{g.icon}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:15,fontWeight:700}}>{g.name}</div>
+                  <div style={{fontSize:12,color:c.textDim}}>{g.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>)}
+
+          {/* COLLOCATIONS */}
+          {tab==="collocations"&&(<div style={{animation:"fadeUp 0.3s"}}>
+            <p style={S.section}>Hukuki Kalıplar</p>
+            {COLLOCATIONS.map((col,i)=>(
+              <div key={col.id} style={{...S.card,padding:"14px 16px",cursor:"default",animation:`slideIn 0.3s ease ${i*0.03}s both`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <span style={{fontFamily:f.serif,fontSize:17,fontWeight:700,color:c.accent}}>{col.en}</span>
+                  <button onClick={()=>speak(col.en)} style={{background:"none",border:"none",fontSize:14,cursor:"pointer"}}>🔊</button>
+                </div>
+                <div style={{fontSize:14,color:c.success,fontWeight:600,marginBottom:6}}>{col.tr}</div>
+                <div style={{background:c.surface,borderRadius:8,padding:"8px 12px"}}>
+                  <div style={{fontSize:13,color:c.textMuted,fontStyle:"italic"}}>"{col.ex}"</div>
+                  <div style={{fontSize:12,color:c.textDim,marginTop:3}}>{col.exTr}</div>
+                </div>
+              </div>
+            ))}
+          </div>)}
+
+          {/* LATIN */}
+          {tab==="latin"&&(<div style={{animation:"fadeUp 0.3s"}}>
+            <p style={S.section}>Latince → İngilizce → Türkçe</p>
+            {words.filter(w=>w.latin).map((w,i)=>(
+              <div key={w.id} style={{...S.card,cursor:"default",padding:"14px 16px",animation:`slideIn 0.3s ease ${i*0.03}s both`}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                  <span style={S.badge(LC[w.level])}>{w.level}</span>
+                  <button onClick={()=>speak(w.en)} style={{background:"none",border:"none",fontSize:14,cursor:"pointer"}}>🔊</button>
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:8}}>
+                  <span style={{fontFamily:f.serif,fontSize:17,fontWeight:700,color:c.warning}}>{w.latin}</span>
+                  <span style={{color:c.textFaint,fontSize:12}}>→</span>
+                  <span style={{fontSize:14,fontWeight:600,color:c.accent}}>{w.en}</span>
+                  <span style={{color:c.textFaint,fontSize:12}}>→</span>
+                  <span style={{fontSize:14,fontWeight:600,color:c.success}}>{w.tr}</span>
+                </div>
+                <div style={{background:c.surface,borderRadius:8,padding:"8px 12px",fontSize:12}}>
+                  <div style={{color:c.textMuted,fontStyle:"italic"}}>"{w.ex}"</div>
+                  <div style={{color:c.textDim,marginTop:3}}>{w.exTr}</div>
+                </div>
+              </div>
+            ))}
+          </div>)}
+        </div>
+      </div>
+    );
+  }
+
+  // ═══ FLASHCARD ═══
+  if(screen==="flashcard"){
+    const w=fcCards[fcIdx];if(!w)return null;
+    const lc=LC[w.level];
+    return(
+      <div style={S.app}><div style={S.wrap}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:16}}>
+          <button style={S.back} onClick={()=>setScreen("home")}>← Geri</button>
+          <span style={{fontSize:12,color:c.textDim}}>{fcIdx+1}/{fcCards.length}</span>
+        </div>
+        <div style={S.progress}><div style={S.fill(((fcIdx+1)/fcCards.length)*100,lc)}/></div>
+
+        <div style={{perspective:1200,marginTop:20,minHeight:280,cursor:"pointer"}} onClick={()=>setFcFlip(!fcFlip)}>
+          <div style={{width:"100%",minHeight:280,position:"relative",transformStyle:"preserve-3d",transition:"transform 0.5s cubic-bezier(0.4,0,0.2,1)",transform:fcFlip?"rotateY(180deg)":"rotateY(0)"}}>
+            {/* Front */}
+            <div style={{position:"absolute",width:"100%",minHeight:280,backfaceVisibility:"hidden",borderRadius:18,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"32px 24px",background:`radial-gradient(ellipse at top,${lc}12,${c.card} 70%)`,border:`1px solid ${lc}30`}}>
+              <span style={S.badge(lc)}>{w.level}</span>
+              <div style={{fontFamily:f.serif,fontSize:32,color:c.text,textAlign:"center",margin:"16px 0 8px"}}>{w.en}</div>
+              <button onClick={e=>{e.stopPropagation();speak(w.en);}} style={{background:lc+"18",border:`1px solid ${lc}30`,borderRadius:8,padding:"6px 18px",color:lc,fontSize:12,fontWeight:600}}>🔊 Dinle</button>
+              <p style={{fontSize:11,color:c.textFaint,marginTop:16}}>çevirmek için dokun</p>
+            </div>
+            {/* Back */}
+            <div style={{position:"absolute",width:"100%",minHeight:280,backfaceVisibility:"hidden",borderRadius:18,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"28px 24px",transform:"rotateY(180deg)",background:c.card,border:`1px solid ${c.cardBorder}`}}>
+              <div style={{fontFamily:f.serif,fontSize:24,color:c.text,textAlign:"center",marginBottom:6}}>{w.tr}</div>
+              <div style={{fontSize:15,color:c.textMuted}}>{w.en}</div>
+              <div style={{width:"100%",background:c.surface,borderRadius:10,padding:"12px",marginTop:12}}>
+                <div style={{fontSize:13,color:c.text,fontStyle:"italic"}}>"{w.ex}"</div>
+                <div style={{fontSize:12,color:c.textDim,marginTop:4}}>{w.exTr}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:10,marginTop:16}}>
+          <button style={{...S.btn(c.danger,false),flex:1}} onClick={()=>{if(fcIdx+1>=fcCards.length){setScreen("fcResult");return;}setFcIdx(i=>i+1);setFcFlip(false);}}>✕ Bilmiyorum</button>
+          <button style={{...S.btn(c.success,false),flex:1}} onClick={()=>{setFcKnown(k=>k+1);if(fcIdx+1>=fcCards.length){setScreen("fcResult");return;}setFcIdx(i=>i+1);setFcFlip(false);}}>✓ Biliyorum</button>
+        </div>
+      </div></div>
+    );
+  }
+
+  // ═══ FC RESULT ═══
+  if(screen==="fcResult"){
+    const total=fcIdx+1;const pct=total>0?Math.round((fcKnown/total)*100):0;
+    return(<div style={S.app}><div style={S.wrap}>
+      <div style={{...S.resultBox,animation:"scaleIn 0.4s"}}>
+        <div style={{fontSize:48,marginBottom:8}}>{pct>=80?"🏆":pct>=50?"💪":"📚"}</div>
+        <div style={{fontFamily:f.serif,fontSize:52,fontWeight:700}}>%{pct}</div>
+        <div style={{fontSize:14,color:c.textMuted,marginTop:8}}>{fcKnown} / {total} doğru</div>
+      </div>
+      <button style={{...S.btn(null,true),marginTop:16}} onClick={startFlashcards}>Tekrar Başla</button>
+      <button style={S.btnOutline} onClick={()=>setScreen("home")}>← Ana Sayfa</button>
+    </div></div>);
+  }
+
+  // ═══ MATCH ═══
+  if(screen==="game"&&gameType==="match"){
+    const en=matchPairs.filter(p=>p.side==="en"),tr=matchPairs.filter(p=>p.side==="tr");
+    return(<div style={S.app}><div style={{...S.wrap,paddingTop:16}}>
+      <button style={S.back} onClick={()=>setScreen("home")}>← Geri</button>
+      <h2 style={{fontFamily:f.serif,fontSize:20,margin:"8px 0"}}>🧩 Eşleştirme</h2>
+      <div style={S.progress}><div style={S.fill((matchDone.length/6)*100,c.success)}/></div>
+      <p style={{fontSize:12,color:c.textDim,margin:"6px 0 12px"}}>{matchDone.length}/6</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {en.map((item,i)=><button key={i} style={S.matchBtn(matchSel.some(s=>s.idx===i&&s.side==="en"),matchDone.includes(item.id))} onClick={()=>handleMatch(item,i)}>{item.text}</button>)}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {tr.map((item,i)=><button key={i} style={S.matchBtn(matchSel.some(s=>s.idx===i+10&&s.side==="tr"),matchDone.includes(item.id))} onClick={()=>handleMatch({...item,idx:i+10},i+10)}>{item.text}</button>)}
+        </div>
+      </div>
+    </div></div>);
+  }
+
+  // ═══ FILL ═══
+  if(screen==="game"&&gameType==="fill"&&gameData[gameIdx]){
+    const w=gameData[gameIdx];
+    return(<div style={S.app}><div style={{...S.wrap,paddingTop:16}}>
+      <button style={S.back} onClick={()=>setScreen("home")}>← Geri</button>
+      <div style={{display:"flex",justifyContent:"space-between",margin:"8px 0"}}>
+        <h2 style={{fontFamily:f.serif,fontSize:20}}>✏️ Harf Tamamlama</h2>
+        <span style={{fontSize:12,color:c.textDim}}>{gameIdx+1}/10</span>
+      </div>
+      <div style={S.progress}><div style={S.fill(((gameIdx+1)/10)*100)}/></div>
+      <div style={{...S.card,textAlign:"center",marginTop:16,padding:24,cursor:"default",animation:"scaleIn 0.3s"}}>
+        <div style={{fontSize:12,color:c.textDim,marginBottom:6}}>Türkçe:</div>
+        <div style={{fontFamily:f.serif,fontSize:24}}>{w.tr}</div>
+        <div style={{fontSize:12,color:c.textFaint,marginTop:4}}>İpucu: {w.en[0]}{"_".repeat(w.en.length-1)}</div>
+      </div>
+      <input value={fillAns} onChange={e=>setFillAns(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!gameAnswer){const ok=fillAns.toLowerCase().trim()===w.en.toLowerCase();setGameAnswer(ok?"correct":"wrong");if(ok)setGameScore(s=>s+1);}}} placeholder="İngilizce yaz..." disabled={!!gameAnswer} style={{...S.input,marginTop:12,borderColor:gameAnswer==="correct"?c.success:gameAnswer==="wrong"?c.danger:c.cardBorder}}/>
+      {!gameAnswer?<button style={{...S.btn(null,true),marginTop:10}} onClick={()=>{const ok=fillAns.toLowerCase().trim()===w.en.toLowerCase();setGameAnswer(ok?"correct":"wrong");if(ok)setGameScore(s=>s+1);}}>Kontrol Et</button>
+      :<div style={{marginTop:10}}>
+        <div style={{padding:"10px 14px",borderRadius:10,background:gameAnswer==="correct"?c.success+"15":c.danger+"15",marginBottom:10}}>
+          <span style={{fontWeight:700,color:gameAnswer==="correct"?c.success:c.danger}}>{gameAnswer==="correct"?"✓ Doğru!":"✕ Yanlış → "+w.en}</span>
+        </div>
+        <button style={S.btn(null,true)} onClick={()=>{if(gameIdx+1>=10){setScreen("gameResult");return;}setGameIdx(i=>i+1);setFillAns("");setGameAnswer(null);}}>Sonraki →</button>
+      </div>}
+    </div></div>);
+  }
+
+  // ═══ SPEED ═══
+  if(screen==="game"&&gameType==="speed"&&gameData[gameIdx]){
+    const w=gameData[gameIdx];
+    const opts=shuffle([w,...shuffle(words.filter(x=>x.id!==w.id)).slice(0,3)]);
+    return(<div style={S.app}><div style={{...S.wrap,paddingTop:16}}>
+      <button style={S.back} onClick={()=>{clearInterval(timerRef.current);setScreen("home");}}>← Geri</button>
+      <div style={{display:"flex",justifyContent:"space-between",margin:"8px 0"}}>
+        <h2 style={{fontFamily:f.serif,fontSize:20}}>⚡ Hız Turu</h2>
+        <span style={{fontSize:26,fontWeight:800,color:speedTime<=10?c.danger:c.accent,fontFamily:f.serif}}>{speedTime}</span>
+      </div>
+      <div style={{height:5,background:c.surface,borderRadius:3,overflow:"hidden",margin:"4px 0 8px"}}>
+        <div style={{width:`${(speedTime/30)*100}%`,height:"100%",background:speedTime<=10?c.danger:c.accent,borderRadius:3,transition:"width 1s linear"}}/>
+      </div>
+      <div style={{textAlign:"center",fontSize:12,color:c.textDim,marginBottom:12}}>Skor: {gameScore}</div>
+      <div style={{...S.card,textAlign:"center",padding:20,cursor:"default",animation:"scaleIn 0.15s"}}>
+        <div style={{fontFamily:f.serif,fontSize:28}}>{w.en}</div>
+      </div>
+      {opts.map((o,i)=><button key={o.id+"-"+i} style={S.quizOpt(gameAnswer==="correct"&&o.id===w.id,gameAnswer==="wrong"&&o.id!==w.id)} onClick={()=>{if(!speedOn||gameAnswer)return;const ok=o.id===w.id;setGameAnswer(ok?"correct":"wrong");if(ok)setGameScore(s=>s+1);setTimeout(()=>{if(gameIdx+1>=gameData.length){clearInterval(timerRef.current);setSpeedOn(false);setScreen("gameResult");return;}setGameIdx(i2=>i2+1);setGameAnswer(null);},350);}}>{o.tr}</button>)}
+    </div></div>);
+  }
+
+  // ═══ GAME RESULT ═══
+  if(screen==="gameResult"){
+    const total=gameType==="speed"?gameIdx+1:gameType==="match"?6:10;
+    const pct=total>0?Math.round((gameScore/total)*100):0;
+    return(<div style={S.app}><div style={S.wrap}>
+      <div style={{...S.resultBox,animation:"scaleIn 0.4s"}}>
+        <div style={{fontSize:48,marginBottom:8}}>{pct>=80?"🏆":pct>=50?"💪":"📚"}</div>
+        <div style={{fontFamily:f.serif,fontSize:52,fontWeight:700}}>%{pct}</div>
+        <div style={{fontSize:14,color:c.textMuted,marginTop:8}}>{gameScore}/{total} doğru</div>
+      </div>
+      <button style={{...S.btn(null,true),marginTop:16}} onClick={()=>{if(gameType==="match")startMatch();else if(gameType==="fill")startFill();else startSpeed();}}>Tekrar Oyna</button>
+      <button style={S.btnOutline} onClick={()=>setScreen("home")}>← Ana Sayfa</button>
+    </div></div>);
+  }
+
+  return null;
+}
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>
